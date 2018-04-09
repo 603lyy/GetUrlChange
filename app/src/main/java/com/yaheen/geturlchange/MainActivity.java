@@ -59,9 +59,9 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
 
     private final int msg_ytf_url_success = 2;
 
-    private TextView tvCopy, tvStart, tvStop, tvClear, tvHang, tvChose;
+    private TextView tvCopy, tvStart, tvStop, tvClear, tvHang, tvChose, tvNum;
 
-    private EditText tvLog;
+    private TextView tvLog;
 
     private Spinner spinner;
 
@@ -102,14 +102,15 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
 
         mClipboardManager = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
 
-        tvCopy = findViewById(R.id.tv_copy);
-        tvStart = findViewById(R.id.tv_start);
-        tvStop = findViewById(R.id.tv_stop);
-        tvClear = findViewById(R.id.tv_clear);
+        tvNum = findViewById(R.id.tv_num);
         tvLog = findViewById(R.id.tv_log);
         tvHang = findViewById(R.id.tv_hang);
+        tvCopy = findViewById(R.id.tv_copy);
+        tvStop = findViewById(R.id.tv_stop);
         tvChose = findViewById(R.id.tv_chose);
         spinner = findViewById(R.id.spinner1);
+        tvClear = findViewById(R.id.tv_clear);
+        tvStart = findViewById(R.id.tv_start);
 
         strPsd = MD5Utils.encrypt(strPsd);
 
@@ -132,11 +133,13 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
                 if (cNum >= max_connect_num) {
                     Toast.makeText(MainActivity.this, "已达到最大请求数", Toast.LENGTH_SHORT).show();
                     return;
+                } else {
+                    cNum++;
+                    tvNum.setText("当前线程数为" + cNum);
                 }
 
                 Toast.makeText(MainActivity.this, "开始请求网络", Toast.LENGTH_SHORT).show();
                 isStarted = true;
-                cNum++;
                 getNumber();
             }
         });
@@ -145,6 +148,8 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             @Override
             public void onClick(View v) {
                 isStarted = false;
+                cNum = 0;
+                tvNum.setText("当前线程数为" + cNum);
             }
         });
 
