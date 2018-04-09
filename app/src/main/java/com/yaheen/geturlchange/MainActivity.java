@@ -4,18 +4,14 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.ContentUris;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -28,8 +24,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.Gson;
-import com.yaheen.geturlchange.bean.YTFBean;
+import com.yaheen.geturlchange.bean.AccountBean;
 import com.yaheen.geturlchange.response.YTFResponse;
+import com.yaheen.geturlchange.socket.ClientManager;
 import com.yaheen.geturlchange.util.MD5Utils;
 import com.yaheen.geturlchange.util.PathUtils;
 
@@ -41,10 +38,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends Activity implements AdapterView.OnItemSelectedListener {
@@ -55,6 +50,10 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
     private static final String YTFURL = "https://api.etherscan.io/api";
 
     private static final String NORMALURL = "https://blockchain.info/q/addressbalance/";
+
+    private static final int FILE_SELECT_CODE = 0;
+
+    private final int max_connect_num = 5;
 
     private final int msg_normal_url_success = 1;
 
@@ -86,12 +85,14 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
 
     boolean isStarted = false;
 
-    private int urlIndex = 0;
+    private volatile int urlIndex = 0;
 
     /**
      * 1表示NORMALURL；2表示YTFURL
      */
     private int urlSelect = 1;
+
+    private int cNum = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -122,13 +123,21 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
         tvStart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (isStarted) {
+//
+                if (map1 == null || map1.size() == 0) {
+                    Toast.makeText(MainActivity.this, "请先选择一个文件", Toast.LENGTH_SHORT).show();
                     return;
                 }
-                isStarted = true;
-                tvHang.setText(urlIndex + 1 + "");
-                getNumber();
+
+                if (cNum >= max_connect_num) {
+                    Toast.makeText(MainActivity.this, "已达到最大请求数", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 Toast.makeText(MainActivity.this, "开始请求网络", Toast.LENGTH_SHORT).show();
+                isStarted = true;
+                cNum++;
+                getNumber();
             }
         });
 
@@ -152,10 +161,6 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
         tvClear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-//                urlIndex = 0;
-//                map1.clear();
-//                isStarted = false;
-//                needPath = "";
                 tvLog.setText("");
                 data = "";
             }
@@ -186,9 +191,13 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
 
     private void getNumber() {
 
-        if (!isStarted || map1 == null || map1.size() == 0 || urlIndex >= map1.size() || urlIndex < 0) {
-            Toast.makeText(MainActivity.this, "请先选择一个文件", Toast.LENGTH_SHORT).show();
+        //true为开始请求网络
+        if (!isStarted) {
             return;
+        }
+
+        if (urlIndex >= map1.size() || urlIndex < 0) {
+            urlIndex = 0;
         }
 
         if (urlSelect == 1) {
@@ -199,7 +208,7 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             return;
         }
 
-        RequestParams params = new RequestParams(baseUrl);
+        final RequestParams params = new RequestParams(baseUrl);
         if (urlSelect == 2) {
             String address = "0x" + map1.get(urlIndex) + ",0x" + map1.get(urlIndex + 1) + ",0x" +
                     map1.get(urlIndex + 2) + ",0x" + map1.get(urlIndex + 3) + ",0x" + map1.get(urlIndex + 4);
@@ -207,14 +216,22 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             params.addQueryStringParameter("action", "balancemulti");
             params.addQueryStringParameter("address", address);
             params.addQueryStringParameter("tag", "last");
+            urlIndex = urlIndex + 5;
+        } else {
+            params.setHeader("url1", map1.get(urlIndex));
+            urlIndex = urlIndex + 1;
         }
+
         x.http().get(params, new Callback.CommonCallback<String>() {
             @Override
             public void onSuccess(String result) {
                 Message mess = new Message();
                 if (urlSelect == 1) {
                     mess.what = msg_normal_url_success;
-                    mess.obj = result;
+                    AccountBean bean = new AccountBean();
+                    bean.setAccount(params.getHeaders().get(0).getValueStr());
+                    bean.setBalance(result);
+                    mess.obj = bean;
                 } else if (urlSelect == 2) {
                     YTFResponse ytfResponse = gson.fromJson(result, YTFResponse.class);
                     if (ytfResponse.result.size() > 0) {
@@ -249,38 +266,36 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             super.handleMessage(msg);
             switch (msg.what) {
                 case msg_normal_url_success:
-                    String str = (String) msg.obj;
-                    int num = Integer.parseInt(str);
+                    AccountBean nBean = (AccountBean) msg.obj;
+                    int num = Integer.parseInt(nBean.getBalance());
                     if (num > 0) {
-                        data = data + "\n" + map1.get(urlIndex) + "：" + num;
+                        data = data + "\n" + nBean.getAccount() + "：" + num;
                         if (num > 1000000) {
-                            sendSMS(map1.get(urlIndex) + "：" + num);
+                            sendSMS(nBean.getAccount() + "：" + num);
                         }
                     }
-                    tvHang.setText(urlIndex + 1 + "");
-                    urlIndex = urlIndex + 1;
+                    tvHang.setText(urlIndex + "");
                     tvLog.setText(data);
                     getNumber();
                     break;
                 case msg_ytf_url_success:
-                    YTFBean ytfBean;
+                    AccountBean accountBean;
                     int num1 = 0;
-                    ArrayList<YTFBean> ytfList = (ArrayList<YTFBean>) msg.obj;
+                    ArrayList<AccountBean> ytfList = (ArrayList<AccountBean>) msg.obj;
                     if (ytfList != null) {
                         for (int i = 0; i < ytfList.size(); i++) {
-                            ytfBean = ytfList.get(i);
+                            accountBean = ytfList.get(i);
                             try {
-                                num1 = Integer.parseInt(ytfBean.getBalance());
+                                num1 = Integer.parseInt(accountBean.getBalance());
                             } catch (NumberFormatException e) {
                                 num1 = 1;
                             }
                             if (num1 > 0) {
-                                data = data + "\n" + ytfBean.getAccount() + "：" + ytfBean.getBalance();
+                                data = data + "\n" + accountBean.getAccount() + "：" + accountBean.getBalance();
                             }
                         }
                     }
-                    tvHang.setText(urlIndex + 5 + "");
-                    urlIndex = urlIndex + 5;
+                    tvHang.setText(urlIndex + "");
                     tvLog.setText(data);
                     getNumber();
                     break;
@@ -288,8 +303,6 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             }
         }
     };
-
-    private static final int FILE_SELECT_CODE = 0;
 
     private void showFileChooser() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
@@ -308,17 +321,8 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
         switch (requestCode) {
             case FILE_SELECT_CODE:
                 if (resultCode == RESULT_OK) {
-                    // Get the Uri of the selected file
                     Uri uri = data.getData();
-                    Log.d(TAG, "File Uri: " + uri.toString());
                     String path = null;
-//                    try {
-//                        path = getPath(this, uri);
-//                    } catch (URISyntaxException e) {
-//                        e.printStackTrace();
-//                    }
-//                    Log.d(TAG, "File Path: " + path);
-
 
                     if ("file".equalsIgnoreCase(uri.getScheme())) {//使用第三方应用打开
                         path = uri.getPath();
@@ -349,25 +353,6 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
         }
         return res;
     }
-
-//    public static String getPath(Context context, Uri uri) throws URISyntaxException {
-//        if ("content".equalsIgnoreCase(uri.getScheme())) {
-//            String[] projection = {"_data"};
-//            Cursor cursor = null;
-//            try {
-//                cursor = context.getContentResolver().query(uri, projection, null, null, null);
-//                int column_index = cursor.getColumnIndexOrThrow("_data");
-//                if (cursor.moveToFirst()) {
-//                    return cursor.getString(column_index);
-//                }
-//            } catch (Exception e) {
-//                // Eat it  Or Log it.
-//            }
-//        } else if ("file".equalsIgnoreCase(uri.getScheme())) {
-//            return uri.getPath();
-//        }
-//        return null;
-//    }
 
     public Map<Integer, String> Txt() {
         //将读出来的一行行数据使用Map存储

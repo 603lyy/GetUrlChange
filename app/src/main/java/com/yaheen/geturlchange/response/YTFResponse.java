@@ -1,6 +1,6 @@
 package com.yaheen.geturlchange.response;
 
-import com.yaheen.geturlchange.bean.YTFBean;
+import com.yaheen.geturlchange.bean.AccountBean;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -13,5 +13,5 @@ public class YTFResponse implements Serializable {
 
     public String message;
 
-    public ArrayList<YTFBean> result;
+    public ArrayList<AccountBean> result;
 }

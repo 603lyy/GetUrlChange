@@ -2,7 +2,7 @@ package com.yaheen.geturlchange.bean;
 
 import java.util.ArrayList;
 
-public class YTFBean {
+public class AccountBean {
 
     private String account;
 
