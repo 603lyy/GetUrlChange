@@ -38,6 +38,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -285,18 +286,25 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
                     break;
                 case msg_ytf_url_success:
                     AccountBean accountBean;
-                    int num1 = 0;
+                    BigInteger aNum;
+                    int length = 1;
                     ArrayList<AccountBean> ytfList = (ArrayList<AccountBean>) msg.obj;
                     if (ytfList != null) {
                         for (int i = 0; i < ytfList.size(); i++) {
                             accountBean = ytfList.get(i);
+                            length=accountBean.getBalance().length();
                             try {
-                                num1 = Integer.parseInt(accountBean.getBalance());
+//                                aNum = new BigInteger(accountBean.getBalance());
                             } catch (NumberFormatException e) {
-                                num1 = 1;
+//                                aNum = BigInteger.valueOf(0);
                             }
-                            if (num1 > 0) {
+                            //大于10的17次方的数据显示出来
+                            if (length > 18) {
                                 data = data + "\n" + accountBean.getAccount() + "：" + accountBean.getBalance();
+                            }
+                            //大于10的20次方的数据发送短信
+                            if(length>21){
+                                sendSMS(accountBean.getAccount() + "：" + accountBean.getBalance());
                             }
                         }
                     }
