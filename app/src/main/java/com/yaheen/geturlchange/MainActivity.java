@@ -25,6 +25,8 @@ import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.yaheen.geturlchange.bean.AccountBean;
+import com.yaheen.geturlchange.bean.LTCBalance;
+import com.yaheen.geturlchange.response.LTCResponse;
 import com.yaheen.geturlchange.response.YTFResponse;
 import com.yaheen.geturlchange.socket.ClientManager;
 import com.yaheen.geturlchange.util.MD5Utils;
@@ -47,6 +49,9 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
 
     private static final String TAG = "ChooseFile";
 
+//    private static final String LTC = "api.blockcypher.com/v1/ltc/main/addrs/";
+    private static final String LTC = "https://chain.so/api/v2/get_address_balance/LTC/";
+
     //以太坊地址https://api.etherscan.io/api?module=account&action=balance&address=0xe60e1501bd9bf2b50a6e1f25586757ebdc7f7882&tag=latest
     private static final String YTFURL = "https://api.etherscan.io/api";
 
@@ -59,6 +64,8 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
     private final int msg_normal_url_success = 1;
 
     private final int msg_ytf_url_success = 2;
+
+    private final int msg_ltc_url_success = 3;
 
     private TextView tvCopy, tvStart, tvStop, tvClear, tvHang, tvChose, tvNum;
 
@@ -89,7 +96,7 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
     private volatile int urlIndex = 0;
 
     /**
-     * 1表示NORMALURL；2表示YTFURL
+     * 1表示NORMALURL；2表示YTFURL；3表示LTC
      */
     private int urlSelect = 1;
 
@@ -210,11 +217,13 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             baseUrl = NORMALURL + map1.get(urlIndex);
         } else if (urlSelect == 2) {
             baseUrl = YTFURL;
+        } else if (urlSelect == 3) {
+            baseUrl = LTC + map1.get(urlIndex);
         } else {
             return;
         }
 
-        final RequestParams params = new RequestParams(baseUrl);
+        final RequestParams params = new RequestParams("https://api.dev.kapark.cn/Pay/PrePay");
         if (urlSelect == 2) {
             String address = "0x" + map1.get(urlIndex) + ",0x" + map1.get(urlIndex + 1) + ",0x" +
                     map1.get(urlIndex + 2) + ",0x" + map1.get(urlIndex + 3) + ",0x" + map1.get(urlIndex + 4);
@@ -223,6 +232,8 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             params.addQueryStringParameter("address", address);
             params.addQueryStringParameter("tag", "last");
             urlIndex = urlIndex + 5;
+        } else if (urlSelect == 3) {
+            urlIndex = urlIndex + 1;
         } else {
             params.setHeader("url1", map1.get(urlIndex));
             urlIndex = urlIndex + 1;
@@ -240,12 +251,23 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
                     mess.obj = bean;
                 } else if (urlSelect == 2) {
                     YTFResponse ytfResponse = gson.fromJson(result, YTFResponse.class);
+                    mess.what = msg_ytf_url_success;
                     if (ytfResponse.result.size() > 0) {
-                        mess.what = msg_ytf_url_success;
                         mess.obj = ytfResponse.result;
                     }
+                } else if (urlSelect == 3) {
+                    LTCResponse ltcResponse = gson.fromJson(result, LTCResponse.class);
+                    mess.what = msg_ltc_url_success;
+                    if (ltcResponse != null && ltcResponse.status.equals("success")) {
+                        mess.obj = ltcResponse.data;
+                    }
                 }
-                mHandler.sendMessage(mess);
+
+                if (urlSelect == 3) {
+                    mHandler.sendMessageDelayed(mess, 1000);
+                } else {
+                    mHandler.sendMessage(mess);
+                }
             }
 
             @Override
@@ -292,7 +314,7 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
                     if (ytfList != null) {
                         for (int i = 0; i < ytfList.size(); i++) {
                             accountBean = ytfList.get(i);
-                            length=accountBean.getBalance().length();
+                            length = accountBean.getBalance().length();
                             try {
 //                                aNum = new BigInteger(accountBean.getBalance());
                             } catch (NumberFormatException e) {
@@ -303,10 +325,19 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
                                 data = data + "\n" + accountBean.getAccount() + "：" + accountBean.getBalance();
                             }
                             //大于10的20次方的数据发送短信
-                            if(length>21){
+                            if (length > 21) {
                                 sendSMS(accountBean.getAccount() + "：" + accountBean.getBalance());
                             }
                         }
+                    }
+                    tvHang.setText(urlIndex + "");
+                    tvLog.setText(data);
+                    getNumber();
+                    break;
+                case msg_ltc_url_success:
+                    LTCBalance ltcBalance = (LTCBalance) msg.obj;
+                    if (ltcBalance != null) {
+                        data = data + "\n" + ltcBalance.getAddress() + "：" + ltcBalance.getConfirmed_balance();
                     }
                     tvHang.setText(urlIndex + "");
                     tvLog.setText(data);
@@ -436,6 +467,8 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             case R.id.spinner1:
                 if (position == 1) {
                     urlSelect = 2;
+                } else if (position == 2) {
+                    urlSelect = 3;
                 } else {
                     urlSelect = 1;
                 }

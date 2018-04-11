@@ -2,8 +2,9 @@
 <resources>
 
     <string-array name="letter">
-        <item>正常</item>
-        <item>以太坊</item>
+        <item>btc</item>
+        <item>eth</item>
+        <item>ltc</item>
     </string-array>
 
 </resources>
