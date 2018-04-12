@@ -223,7 +223,7 @@ public class MainActivity extends Activity implements AdapterView.OnItemSelected
             return;
         }
 
-        final RequestParams params = new RequestParams("https://api.dev.kapark.cn/Pay/PrePay");
+        final RequestParams params = new RequestParams(baseUrl);
         if (urlSelect == 2) {
             String address = "0x" + map1.get(urlIndex) + ",0x" + map1.get(urlIndex + 1) + ",0x" +
                     map1.get(urlIndex + 2) + ",0x" + map1.get(urlIndex + 3) + ",0x" + map1.get(urlIndex + 4);
