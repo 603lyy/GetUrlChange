@@ -5,6 +5,7 @@
         <item>btc</item>
         <item>eth</item>
         <item>ltc</item>
+        <item>usdt</item>
     </string-array>
 
 </resources>

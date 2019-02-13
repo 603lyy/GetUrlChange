@@ -38,4 +38,5 @@ dependencies {
     //网络请求工具
     implementation 'org.xutils:xutils:3.3.42'
     implementation 'com.google.code.gson:gson:2.2.4'
+    implementation 'com.squareup.okhttp3:okhttp:3.9.0'
 }
